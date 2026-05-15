@@ -62,6 +62,8 @@ export interface TextInferResponse {
   confidence: number;
   probabilities: { safe: number; harmful: number };
   elapsedMs: number;
+  tokenCount?: number;
+  logits?: number[];
   detectionLayer?: string;
 }
 
@@ -76,6 +78,8 @@ export function parseTextInferResponse(json: unknown): TextInferResponse {
     confidence: Number(o.confidence),
     probabilities: o.probabilities as TextInferResponse["probabilities"],
     elapsedMs: Number(o.elapsedMs),
+    tokenCount: o.tokenCount != null ? Number(o.tokenCount) : undefined,
+    logits: Array.isArray(o.logits) ? (o.logits as number[]) : undefined,
     detectionLayer: o.detectionLayer as string | undefined,
   };
 }

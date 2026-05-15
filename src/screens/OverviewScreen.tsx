@@ -1,16 +1,10 @@
-import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React from "react";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { AppScreen } from "@/components/layout/AppScreen";
 import { APP } from "@/config/app";
-import { DATASETS } from "@/data/datasets";
 import { useApiBase } from "@/context/ApiContext";
+import { DATASETS } from "@/data/datasets";
+import { common } from "@/theme/common";
 import { colors } from "@/theme/colors";
 
 const stats = [
@@ -21,24 +15,22 @@ const stats = [
 ];
 
 export default function OverviewScreen() {
-  const { baseUrl, setBaseUrl } = useApiBase();
-  const [draft, setDraft] = useState(baseUrl);
-
-  useEffect(() => {
-    setDraft(baseUrl);
-  }, [baseUrl]);
-
+  const { baseUrl } = useApiBase();
+  const apiHostLabel = baseUrl.replace(/^https?:\/\//, "");
   return (
-    <SafeAreaView style={styles.safe} edges={["bottom"]}>
-      <ScrollView contentContainerStyle={styles.scroll} style={styles.root}>
-        <LinearGradient
-          colors={["#4f46e5", "#5b21b6", "#6d28d9"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>Master's Thesis · 2026</Text>
+    <AppScreen>
+      <View style={styles.hero}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.logoShell}>
+              <Image
+                source={require("../../assets/ujn_logo.png")}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Master's Thesis · 2026</Text>
+            </View>
           </View>
           <Text style={styles.heroTitle}>{APP.title}</Text>
           <Text style={styles.heroSub}>
@@ -54,7 +46,7 @@ export default function OverviewScreen() {
               {APP.supervisor} · {APP.supervisorZh}
             </Text>
           </View>
-        </LinearGradient>
+        </View>
 
         <View style={styles.statsRow}>
           {stats.map((s) => (
@@ -66,29 +58,9 @@ export default function OverviewScreen() {
           ))}
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Backend URL (Next.js)</Text>
-          <Text style={styles.cardHint}>
-            Same origin as your computer or server running `next-meddef`
-            (e.g. http://192.168.1.10:3000). Saved on device.
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="https://your-meddef-host"
-            placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            value={draft}
-            onChangeText={setDraft}
-            onEndEditing={() => void setBaseUrl(draft)}
-          />
-          <Text style={styles.saveLink} onPress={() => void setBaseUrl(draft)}>
-            Save
-          </Text>
-        </View>
+        <Text style={styles.apiFoot}>API: {apiHostLabel}</Text>
 
-        <View style={styles.card}>
+        <View style={common.card}>
           <Text style={styles.cardTitle}>Supported Datasets</Text>
           {Object.values(DATASETS).map((d) => (
             <View key={d.name} style={styles.datasetRow}>
@@ -100,27 +72,43 @@ export default function OverviewScreen() {
             </View>
           ))}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  root: { flex: 1 },
-  scroll: { paddingBottom: 32 },
   hero: {
-    margin: 16,
+    marginBottom: 16,
     borderRadius: 16,
     padding: 20,
+    backgroundColor: "#4f46e5",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  logoShell: {
+    backgroundColor: "rgba(248,250,252,0.95)",
+    borderRadius: 999,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.65)",
+  },
+  logoImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   badge: {
-    alignSelf: "flex-start",
     backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    marginBottom: 12,
   },
   badgeText: { color: "#fff", fontSize: 11, fontWeight: "600" },
   heroTitle: {
@@ -161,9 +149,9 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 12,
     gap: 8,
     justifyContent: "space-between",
+    marginBottom: 4,
   },
   statCard: {
     width: "48%",
@@ -180,32 +168,13 @@ const styles = StyleSheet.create({
   statIcon: { width: 8, height: 8, borderRadius: 4, marginBottom: 8 },
   statValue: { fontSize: 22, fontWeight: "700", color: colors.text },
   statLabel: { fontSize: 11, color: colors.muted, marginTop: 2 },
-  card: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+  apiFoot: {
+    fontSize: 11,
+    color: colors.muted,
+    marginBottom: 12,
+    marginTop: 4,
   },
   cardTitle: { fontSize: 16, fontWeight: "700", color: colors.text, marginBottom: 8 },
-  cardHint: { fontSize: 12, color: colors.muted, marginBottom: 10, lineHeight: 18 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    color: colors.text,
-    backgroundColor: "#fafafa",
-  },
-  saveLink: {
-    color: colors.indigo,
-    fontWeight: "600",
-    marginTop: 10,
-    fontSize: 14,
-  },
   datasetRow: {
     paddingVertical: 12,
     borderTopWidth: 1,

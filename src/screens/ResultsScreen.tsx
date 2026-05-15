@@ -1,190 +1,275 @@
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useCallback, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { getEvaluations, type EvaluationRow } from "@/api/client";
+import { AppScreen } from "@/components/layout/AppScreen";
+import { PrimaryButton } from "@/components/ui/Buttons";
+import { ChipStrip } from "@/components/ui/ChipStrip";
+import { SelectableChip } from "@/components/ui/SelectableChip";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { useApiBase } from "@/context/ApiContext";
-import { ATTACK_TYPES, type AttackType } from "@/data/datasets";
+import {
+  ATTACK_EPSILONS,
+  ATTACK_TYPES,
+  DATASETS,
+  type AttackType,
+} from "@/data/datasets";
+import { chipStyles } from "@/theme/chips";
+import { common } from "@/theme/common";
 import { colors } from "@/theme/colors";
 
-const DS_KEYS = ["tbcr", "chest_xray", "roct"] as const;
+function cellColor(acc: number): string {
+  if (acc >= 0.7) return "#059669";
+  if (acc >= 0.5) return "#d97706";
+  return "#ef4444";
+}
 
 export default function ResultsScreen() {
   const { baseUrl } = useApiBase();
   const [dataset, setDataset] = useState<string>("tbcr");
   const [attack, setAttack] = useState<AttackType>("FGSM");
-  const [rows, setRows] = useState<EvaluationRow[]>([]);
+  const [evals, setEvals] = useState<EvaluationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!baseUrl) {
-      setRows([]);
-      setError("Set Backend URL on Overview to load Prisma evaluations.");
-      return;
-    }
+  const fetchEvals = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getEvaluations(baseUrl);
-      const filtered = data.filter(
+      const rows = data.filter(
         (e) => e.dataset.name === dataset && e.attack === attack,
       );
-      setRows(filtered);
+      setEvals(rows);
     } catch (e) {
-      setRows([]);
+      setEvals([]);
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
     }
   }, [baseUrl, dataset, attack]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void fetchEvals();
+    }, [fetchEvals]),
+  );
 
-  const sorted = [...rows].sort((a, b) => a.epsilon - b.epsilon);
+  const grouped = useMemo(() => {
+    const g: Record<string, Record<string, EvaluationRow>> = {};
+    for (const e of evals) {
+      const key = `${e.model.variant} (${e.model.stage})`;
+      (g[key] ??= {})[e.epsilon.toString()] = e;
+    }
+    return g;
+  }, [evals]);
+
+  const epsilons = ATTACK_EPSILONS.filter((v) =>
+    attack === "CLEAN" ? v === 0 : true,
+  );
+
+  const ds = DATASETS[dataset as keyof typeof DATASETS];
 
   return (
-    <SafeAreaView style={styles.safe} edges={["bottom"]}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.h1}>Results</Text>
-        <Text style={styles.lead}>
-          Reads `/api/evaluations` (Prisma, same as the web). Pick dataset and
-          attack, then refresh.
-        </Text>
+    <AppScreen>
+      <ScreenHeader
+        title="Evaluation results"
+        subtitle="Accuracy vs ε (models × epsilon), from Prisma via `/api/evaluations`. Same filters as the web dashboard."
+      />
 
-        <View style={styles.card}>
-          <Text style={styles.label}>Dataset</Text>
-          <View style={styles.row}>
-            {DS_KEYS.map((d) => (
-              <Pressable
-                key={d}
-                onPress={() => setDataset(d)}
-                style={[styles.chip, dataset === d && styles.chipOn]}
-              >
-                <Text style={[styles.chipTxt, dataset === d && styles.chipTxtOn]}>
-                  {d}
-                </Text>
-              </Pressable>
-            ))}
+      <View style={common.card}>
+        <Text style={common.label}>Dataset</Text>
+        <View style={chipStyles.rowWrap}>
+          {Object.values(DATASETS).map((d) => (
+            <SelectableChip
+              key={d.name}
+              variant="wrap"
+              selected={dataset === d.name}
+              label={d.displayName}
+              numberOfLines={1}
+              onPress={() => setDataset(d.name)}
+            />
+          ))}
+        </View>
+        <Text style={[common.label, { marginTop: 12 }]}>Attack</Text>
+        <ChipStrip>
+          {ATTACK_TYPES.map((a) => (
+            <SelectableChip
+              key={a}
+              variant="compact"
+              selected={attack === a}
+              label={a}
+              onPress={() => setAttack(a)}
+            />
+          ))}
+        </ChipStrip>
+      </View>
+
+      <PrimaryButton
+        title="Refresh"
+        loading={loading}
+        onPress={() => void fetchEvals()}
+        style={styles.refreshBtn}
+      />
+
+      {error && <Text style={common.errorText}>{error}</Text>}
+
+      {!loading && evals.length === 0 && !error && (
+        <View style={common.card}>
+          <Text style={styles.emptyTxt}>
+            No evaluation data for this filter. Populate via POST to{" "}
+            <Text style={styles.mono}>/api/evaluations</Text> or your training
+            pipeline.
+          </Text>
+        </View>
+      )}
+
+      {!loading && evals.length > 0 && (
+        <View style={common.card}>
+          <View style={styles.tableHead}>
+            <Text style={styles.tableTitle}>
+              {attack} — accuracy vs ε
+            </Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeTxt}>{ds?.displayName ?? dataset}</Text>
+            </View>
           </View>
-          <Text style={[styles.label, { marginTop: 12 }]}>Attack</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.row}>
-              {ATTACK_TYPES.map((a) => (
-                <Pressable
-                  key={a}
-                  onPress={() => setAttack(a)}
-                  style={[styles.mini, attack === a && styles.miniOn]}
-                >
-                  <Text style={[styles.miniTxt, attack === a && styles.miniTxtOn]}>
-                    {a}
+          <ScrollView horizontal showsHorizontalScrollIndicator>
+            <View>
+              <View style={[styles.tr, styles.thRow]}>
+                <Text style={[styles.th, styles.modelCol]}>Model</Text>
+                {epsilons.map((eps) => (
+                  <Text key={eps} style={styles.th}>
+                    ε={eps}
                   </Text>
-                </Pressable>
+                ))}
+              </View>
+              {Object.entries(grouped).map(([modelKey, byEps]) => (
+                <View key={modelKey} style={styles.tr}>
+                  <Text style={[styles.td, styles.modelCol]} numberOfLines={2}>
+                    {modelKey}
+                  </Text>
+                  {epsilons.map((eps) => {
+                    const row = byEps[eps.toString()];
+                    const acc = row?.robustAccuracy ?? row?.accuracy;
+                    return (
+                      <View key={eps} style={styles.tdNum}>
+                        {acc != null ? (
+                          <Text
+                            style={[
+                              styles.acc,
+                              { color: cellColor(acc) },
+                            ]}
+                          >
+                            {(acc * 100).toFixed(1)}%
+                          </Text>
+                        ) : (
+                          <Text style={styles.dash}>—</Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
               ))}
             </View>
           </ScrollView>
-        </View>
-
-        <Pressable style={styles.refresh} onPress={() => void load()}>
-          <Text style={styles.refreshTxt}>Refresh</Text>
-        </Pressable>
-
-        {loading && <ActivityIndicator style={{ marginTop: 16 }} />}
-
-        {error && <Text style={styles.err}>{error}</Text>}
-
-        {!loading && sorted.length === 0 && !error?.includes("Set Backend") && (
-          <Text style={styles.empty}>No evaluation rows for this filter.</Text>
-        )}
-
-        {sorted.map((e) => (
-          <View key={e.id} style={styles.rowCard}>
-            <Text style={styles.eps}>ε = {e.epsilon}</Text>
-            <Text style={styles.metric}>acc {(e.accuracy * 100).toFixed(2)}%</Text>
-            {e.robustAccuracy != null && (
-              <Text style={styles.metric}>
-                robust {(e.robustAccuracy * 100).toFixed(2)}%
-              </Text>
-            )}
-            <Text style={styles.variant}>
-              {e.model.variant} · {e.model.stage}
-            </Text>
+          <View style={styles.legend}>
+            <View style={styles.legendRow}>
+              <View style={[styles.dot, { backgroundColor: "#059669" }]} />
+              <Text style={styles.legendTxt}>≥70%</Text>
+            </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.dot, { backgroundColor: "#d97706" }]} />
+              <Text style={styles.legendTxt}>50–70%</Text>
+            </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.dot, { backgroundColor: "#ef4444" }]} />
+              <Text style={styles.legendTxt}>&lt;50%</Text>
+            </View>
           </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+        </View>
+      )}
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  scroll: { padding: 16, paddingBottom: 40 },
-  h1: { fontSize: 22, fontWeight: "700", color: colors.text },
-  lead: { marginTop: 6, fontSize: 13, color: colors.muted, lineHeight: 20 },
-  card: {
-    marginTop: 16,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  label: { fontSize: 12, fontWeight: "600", color: colors.muted, marginBottom: 8 },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-  },
-  chipOn: { borderColor: colors.indigo, backgroundColor: "#eef2ff" },
-  chipTxt: { fontSize: 12, color: colors.muted, fontWeight: "600" },
-  chipTxtOn: { color: colors.indigo },
-  mini: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  miniOn: { borderColor: colors.indigo, backgroundColor: "#eef2ff" },
-  miniTxt: { fontSize: 10, color: colors.muted, fontWeight: "600" },
-  miniTxtOn: { color: colors.indigo },
-  refresh: {
+  refreshBtn: {
     alignSelf: "flex-start",
     marginTop: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: colors.indigo,
+    paddingHorizontal: 20,
   },
-  refreshTxt: { color: "#fff", fontWeight: "700" },
-  err: { color: "#dc2626", marginTop: 12 },
-  empty: { marginTop: 16, color: colors.muted },
-  rowCard: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 10,
+  emptyTxt: { fontSize: 13, color: colors.muted, lineHeight: 20 },
+  mono: { fontFamily: "monospace", fontSize: 12, color: colors.text },
+  tableHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+  tableTitle: { fontSize: 15, fontWeight: "700", color: colors.text, flex: 1 },
+  badge: {
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.card,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  eps: { fontWeight: "700", color: colors.text },
-  metric: { marginTop: 4, fontSize: 13, color: colors.muted },
-  variant: {
-    marginTop: 6,
+  badgeTxt: { fontSize: 11, color: colors.muted, fontWeight: "600" },
+  tr: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  thRow: {
+    borderTopWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    paddingBottom: 8,
+    marginBottom: 4,
+  },
+  th: {
+    width: 72,
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.muted,
+    textTransform: "uppercase",
+    textAlign: "right",
+    paddingVertical: 4,
+  },
+  modelCol: { width: 160, textAlign: "left" },
+  td: {
+    width: 160,
     fontSize: 11,
-    fontFamily: "monospace",
-    color: colors.indigo,
+    fontWeight: "600",
+    color: colors.text,
+    paddingVertical: 10,
+    paddingRight: 8,
+  },
+  tdNum: {
+    width: 72,
+    alignItems: "flex-end",
+    justifyContent: "center",
+    paddingVertical: 10,
+  },
+  acc: { fontSize: 12, fontWeight: "700" },
+  dash: { color: "#cbd5e1", fontSize: 13 },
+  legend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  legendTxt: { fontSize: 11, color: colors.muted },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });

@@ -34,15 +34,20 @@ export default function NavigationRoot() {
       <NavigationContainer theme={navTheme}>
         <Tab.Navigator
           screenOptions={{
+            headerShadowVisible: false,
             headerTintColor: "#fff",
             headerStyle: { backgroundColor: colors.sidebar },
             headerTitleStyle: { fontWeight: "700", fontSize: 16 },
             tabBarStyle: {
               backgroundColor: colors.sidebar,
               borderTopColor: "#334155",
+              height: 56,
             },
+            tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginBottom: 2 },
+            tabBarIconStyle: { marginTop: 4 },
             tabBarActiveTintColor: "#c7d2fe",
             tabBarInactiveTintColor: "#64748b",
+            tabBarHideOnKeyboard: true,
           }}
         >
           <Tab.Screen

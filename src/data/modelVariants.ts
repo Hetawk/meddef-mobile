@@ -45,3 +45,17 @@ export const MODEL_VARIANTS: {
     accent: "#059669",
   },
 ];
+
+/** Training stages (mirrors models page `STAGES`). */
+export const MODEL_STAGES: { key: string; label: string; desc: string }[] = [
+  {
+    key: "STAGE1",
+    label: "Stage 1",
+    desc: "Full-parameter supervised training",
+  },
+  {
+    key: "DISTILL_V2",
+    label: "Distill v2 (Final)",
+    desc: "Final model · enhanced distillation with adversarial fine-tuning",
+  },
+];
