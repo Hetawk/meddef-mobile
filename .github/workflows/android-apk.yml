@@ -1,0 +1,105 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+
+      - name: APK checksum and size
+        id: apk_meta
+        run: |
+          APK=android/app/build/outputs/apk/release/meddef.apk
+          echo "sha256=$(sha256sum "$APK" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "size_bytes=$(stat -c%s "$APK")" >> "$GITHUB_OUTPUT"
+
+      # Secrets (meddef_mobile repo → Settings → Secrets):
+      #   EKD_DIGITAL_ASSETS_API_SECRET — sk_… Bearer for https://assets.andgroupco.com
+      #   EKD_DIGITAL_ASSETS_API_URL      — optional API base (default: production)
+      #   NEXT_MEDDEF_DISPATCH_TOKEN      — PAT with repo + workflow on next-meddef
+      #   NEXT_MEDDEF_REPO                — e.g. your-org/next-meddef
+      - name: Upload APK to EKD Digital Assets
+        id: ekd_upload
+        if: >-
+          github.event_name != 'pull_request' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+          secrets.EKD_DIGITAL_ASSETS_API_SECRET != ''
+        env:
+          EKD_DIGITAL_ASSETS_API_SECRET: ${{ secrets.EKD_DIGITAL_ASSETS_API_SECRET }}
+          EKD_DIGITAL_ASSETS_API_URL: ${{ secrets.EKD_DIGITAL_ASSETS_API_URL }}
+        run: |
+          node scripts/ekd-assets-upload-apk.js android/app/build/outputs/apk/release/meddef.apk \
+            | tee /tmp/ekd-upload.json
+          echo "download_url=$(jq -r .download_url /tmp/ekd-upload.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Write downloads manifest artifact
+        id: manifest
+        env:
+          ANDROID_APK_URL: ${{ steps.ekd_upload.outputs.download_url || '/downloads/meddef.apk' }}
+          ANDROID_SIZE_BYTES: ${{ steps.apk_meta.outputs.size_bytes }}
+          ANDROID_SHA256: ${{ steps.apk_meta.outputs.sha256 }}
+        run: |
+          mkdir -p dist/downloads
+          node scripts/sync-version-json.js dist/downloads
+          echo "version=$(jq -r .platforms.android.version dist/downloads/manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "version_code=$(jq -r .platforms.android.versionCode dist/downloads/manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "apk_url=$(jq -r .platforms.android.url dist/downloads/manifest.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload meddef.apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: meddef-apk
+          path: android/app/build/outputs/apk/release/meddef.apk
+          if-no-files-found: error
+
+      - name: Upload downloads manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: downloads-manifest
+          path: |
+            dist/downloads/manifest.json
+            dist/downloads/version.json
+
+      - name: Trigger next-meddef manifest sync
+        if: >-
+          github.event_name != 'pull_request' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+          secrets.NEXT_MEDDEF_DISPATCH_TOKEN != '' &&
+          secrets.NEXT_MEDDEF_REPO != ''
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.NEXT_MEDDEF_DISPATCH_TOKEN }}
+          repository: ${{ secrets.NEXT_MEDDEF_REPO }}
+          event-type: mobile-apk-published
+          client-payload: |-
+            {
+              "apk_url": "${{ steps.manifest.outputs.apk_url }}",
+              "sha256": "${{ steps.apk_meta.outputs.sha256 }}",
+              "size_bytes": ${{ steps.apk_meta.outputs.size_bytes }},
+              "version": "${{ steps.manifest.outputs.version }}",
+              "version_code": ${{ steps.manifest.outputs.version_code }},
+              "mobile_run_id": "${{ github.run_id }}",
+              "use_cdn": ${{ steps.ekd_upload.outputs.download_url != '' }}
+            }

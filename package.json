@@ -9,7 +9,10 @@
     "web": "expo start --web",
     "lint": "tsc --noEmit",
     "verify": "npm run lint",
-    "android:install": "npx expo run:android"
+    "android:install": "npx expo run:android",
+    "android:apk": "cd android && ./gradlew assembleDebug",
+    "android:apk:release": "cd android && ./gradlew assembleRelease",
+    "sync:version": "node scripts/sync-version-json.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
