@@ -1,12 +1,11 @@
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ApiProvider } from "@/context/ApiContext";
 import { useAppUpdateCheck } from "@/hooks/useAppUpdate";
+import { hideSplashAfterReady } from "@/lib/splash";
 import NavigationRoot from "@/navigation/MainTabs";
-import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-
-const SPLASH_MIN_MS = 600;
 
 function AppRoot() {
   useAppUpdateCheck();
@@ -14,20 +13,23 @@ function AppRoot() {
 }
 
 export default function App() {
-  useEffect(() => {
-    const id = setTimeout(() => {
-      void SplashScreen.hideAsync();
-    }, SPLASH_MIN_MS);
-    return () => clearTimeout(id);
-  }, []);
+  const [layoutReady, setLayoutReady] = useState(false);
+
+  const onRootLayout = useCallback(() => {
+    if (layoutReady) return;
+    setLayoutReady(true);
+    hideSplashAfterReady();
+  }, [layoutReady]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <ApiProvider>
-          <AppRoot />
-        </ApiProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <AppErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }} onLayout={onRootLayout}>
+        <SafeAreaProvider>
+          <ApiProvider>
+            <AppRoot />
+          </ApiProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </AppErrorBoundary>
   );
 }

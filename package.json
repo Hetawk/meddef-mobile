@@ -9,9 +9,11 @@
     "web": "expo start --web",
     "lint": "tsc --noEmit",
     "verify": "npm run lint",
-    "android:install": "npx expo run:android",
-    "android:apk": "cd android && ./gradlew assembleDebug",
-    "android:apk:release": "cd android && ./gradlew assembleRelease",
+    "android:install": "npx expo run:android --variant release --device",
+    "android:apk:debug": "cd android && ./gradlew assembleDebug",
+    "android:apk": "npm run android:apk:release",
+    "android:apk:release": "cd android && NODE_ENV=production ./gradlew assembleRelease",
+    "android:install:release": "npm run android:apk:release && adb install -r android/app/build/outputs/apk/release/meddef.apk",
     "sync:version": "node scripts/sync-version-json.js"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
     "base64-js": "^1.5.1",
     "expo": "~54.0.33",
     "expo-build-properties": "~1.0.10",
+    "expo-constants": "~18.0.13",
     "expo-file-system": "~19.0.22",
     "expo-font": "~14.0.11",
     "expo-image-manipulator": "~14.0.8",

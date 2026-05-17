@@ -4,12 +4,12 @@
     "slug": "meddef_mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/ujn_logo.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "scheme": "meddef",
     "splash": {
-      "image": "./assets/ujn_logo.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -25,7 +25,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/ujn_logo.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -42,7 +42,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/ujn_logo.png",
+          "image": "./assets/logo.png",
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "imageWidth": 200

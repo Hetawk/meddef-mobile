@@ -23,7 +23,7 @@ export default function OverviewScreen() {
           <View style={styles.heroTopRow}>
             <View style={styles.logoShell}>
               <Image
-                source={require("../../assets/ujn_logo.png")}
+                source={require("../../assets/logo.png")}
                 style={styles.logoImg}
                 resizeMode="contain"
               />

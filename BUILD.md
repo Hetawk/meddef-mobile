@@ -1,5 +1,17 @@
 # Building MedDef for Android (EAS)
 
+## Sideload installs (USB / APK file)
+
+**Use a release APK, not debug.** `assembleDebug` / `npm run android:apk:debug` produces a build that loads JavaScript from Metro on `localhost:8081`. If Metro is not running (`npm start`), the app stays on the splash screen forever because React never mounts (logcat: `Unable to load script`, `Failed to connect to localhost/127.0.0.1:8081`).
+
+```bash
+cd meddef_mobile
+npm run android:install:release   # assembleRelease + adb install -r
+# APK: android/app/build/outputs/apk/release/meddef.apk
+```
+
+For day-to-day dev with hot reload, use `npm start` plus `npx expo run:android` (debug) on a device with USB or `adb reverse tcp:8081 tcp:8081`.
+
 The default Play Store artifact is an **AAB** (Android App Bundle). For sideloading or hosting an installable file, use an **APK** by setting `android.buildType` to `"apk"` in [`eas.json`](./eas.json) (see [Build APKs for devices](https://docs.expo.dev/build-reference/apk/)).
 
 ## One-time setup
